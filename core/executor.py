@@ -76,7 +76,7 @@ def run_pipeline(query: str, dataset: HeteroData, model_id: str):
         ),
         model_id
     )
-    summary_match = re.search(r"<one-line-summary>(.*?)</one-line-summary>", summary_raw, re.DOTALL)
-    summary = summary_match.group(1).strip() if summary_match else "Summary not found."
+    # summary_match = re.search(r"<one-line-summary>(.*?)</one-line-summary>", summary_raw, re.DOTALL)
+    # summary = summary_match.group(1).strip() if summary_match else "Summary not found."
 
-    return summary, code_block, result
+    return summary_raw, code_block, result
