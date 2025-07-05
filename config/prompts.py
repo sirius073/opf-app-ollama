@@ -11,72 +11,121 @@ Your task is to write clean, valid Python code that:
 
 # DATA SCHEMA (based on OPFData, with clear names and short forms)
 
-## NODE TYPES:
+## NODE TYPES
 
-### `data['bus']` (Node):
-- `data['bus'].x`: shape [num_buses, 4]
-  - Column 0 → base_voltage_kv (base_kv)
-  - Column 1 → bus_type (PQ=1, PV=2, ref=3, inactive=4)
-  - Column 2 → minimum_voltage_magnitude_limit (vmin)
-  - Column 3 → maximum_voltage_magnitude_limit (vmax)
+data['bus'].x → shape [num_buses, 4]:
+- [0] base_kv: Base voltage level (in kilovolts) used for converting real-world units to per-unit system for numerical stability.
+- [1] bus_type: Integer code for bus category: 1=PQ (load bus), 2=PV (generator bus), 3=ref/slack bus (voltage + angle reference), 4=inactive (not part of power flow).
+- [2] vmin: Minimum allowable voltage magnitude at the bus (in per-unit); enforces voltage safety lower bound.
+- [3] vmax: Maximum allowable voltage magnitude at the bus (in per-unit); enforces voltage safety upper bound.
 
-- `data['bus'].y`: shape [num_buses, 2]
-  - Column 0 → voltage_angle_solution (va)
-  - Column 1 → voltage_magnitude_solution (vm)
+data['bus'].y → shape [num_buses, 2]:
+- [0] va: Voltage angle solution (in radians) after power flow is solved; relative phase of voltage.
+- [1] vm: Voltage magnitude solution (in per-unit) after power flow is solved.
 
-### `data['generator']` (Node):
-- `data['generator'].x`: shape [num_generators, 11]
-  - Column 0 → machine_base_mva (mbase)
-  - Column 1 → active_power_output (pg)
-  - Column 2 → minimum_active_power (pmin)
-  - Column 3 → maximum_active_power (pmax)
-  - Column 4 → reactive_power_output (qg)
-  - Column 5 → minimum_reactive_power (qmin)
-  - Column 6 → maximum_reactive_power (qmax)
-  - Column 7 → voltage_setpoint (vg)
-  - Column 8 → cost_quadratic (c2)
-  - Column 9 → cost_linear (c1)
-  - Column 10 → cost_constant (c0)
+---
 
-- `data['generator'].y`: shape [num_generators, 2]
-  - Column 0 → active_power_solution (pg)
-  - Column 1 → reactive_power_solution (qg)
+data['generator'].x → shape [num_generators, 11]:
+- [0] mbase: Generator’s power base rating (in MVA); used for scaling internal parameters.
+- [1] pg: Scheduled or forecasted real power output (in MW).
+- [2] pmin: Minimum real power the generator is allowed to produce.
+- [3] pmax: Maximum real power limit.
+- [4] qg: Scheduled reactive power output (in MVAr).
+- [5] qmin: Minimum reactive power limit.
+- [6] qmax: Maximum reactive power limit.
+- [7] vg: Voltage magnitude setpoint for the bus this generator is controlling (applies if PV or ref bus).
+- [8] c2: Coefficient of quadratic term in generator cost function (for pg²).
+- [9] c1: Linear cost coefficient (for pg).
+- [10] c0: Constant offset in cost function.
 
-### `data['load']` (Node):
-- `data['load'].x`: shape [num_loads, 2]
-  - Column 0 → active_power_demand (pd)
-  - Column 1 → reactive_power_demand (qd)
+data['generator'].y → shape [num_generators, 2]:
+- [0] pg: Real power output from the generator after solving the OPF (solution value).
+- [1] qg: Reactive power output from the generator after solving OPF.
 
-### `data['shunt']` (Node):
-- `data['shunt'].x`: shape [num_shunts, 2]
-  - Column 0 → susceptance (bs)
-  - Column 1 → conductance (gs)
+---
 
-## EDGE TYPES (Heterogeneous):
+data['load'].x → shape [num_loads, 2]:
+- [0] pd: Active power demand at this load (in MW).
+- [1] qd: Reactive power demand (in MVAr); affects voltage and power factor.
 
-### AC Line: `('bus', 'ac_line', 'bus')`
-- `edge_index`: [2, num_ac_lines] — [source_bus_index, target_bus_index]
-- `edge_attr`: [num_ac_lines, 9]
-  - angle_min (θ_l), angle_max (θ_u), b_from, b_to,
-    resistance (br_r), reactance (br_x),
-    thermal_rating_a (rate_a), b (rate_b), c (rate_c)
-- `edge_label`: [num_ac_lines, 4]
-  - active_power_to (pt), reactive_power_to (qt),
-    active_power_from (pf), reactive_power_from (qf)
+---
 
-### Transformer: `('bus', 'transformer', 'bus')`
-- `edge_index`: [2, num_transformers]
-- `edge_attr`: [num_transformers, 11]
-  - angle_min (θ_l), angle_max (θ_u), resistance (br_r), reactance (br_x),
-    thermal_rating_a (rate_a), b (rate_b), c (rate_c),
-    tap_ratio (tap), phase_shift (shift), b_from, b_to
-- `edge_label`: [num_transformers, 4] → [pt, qt, pf, qf]
+data['shunt'].x → shape [num_shunts, 2]:
+- [0] bs: Susceptance (imaginary admittance); controls how much reactive power is injected or absorbed.
+- [1] gs: Conductance (real part of admittance); models energy loss at the shunt (real power dissipation).
 
-### Generator/Load/Shunt Links:
-- `('generator', 'generator_link', 'bus')` and `('bus', 'generator_link', 'generator')`
-- `('load', 'load_link', 'bus')` and `('bus', 'load_link', 'load')`
-- `('shunt', 'shunt_link', 'bus')` and `('bus', 'shunt_link', 'shunt')`
-  • edge_index: [2, N] — connectivity only
+---
+
+## EDGE TYPES
+
+### AC Line: ('bus', 'ac_line', 'bus')  
+Models physical transmission lines between buses.
+
+edge_index → shape [2, num_ac_lines]:
+- Row 0: Source bus index (from bus)
+- Row 1: Destination bus index (to bus)
+
+edge_attr → shape [num_ac_lines, 9]:
+- [0] θ_l: Minimum allowed voltage angle difference between source and target bus.
+- [1] θ_u: Maximum allowed voltage angle difference.
+- [2] b_from: Shunt charging susceptance on the "from" bus side.
+- [3] b_to: Shunt charging susceptance on the "to" bus side.
+- [4] br_r: Series resistance of the line (causes real power loss).
+- [5] br_x: Series reactance of the line (affects voltage drop and reactive flow).
+- [6] rate_a: Maximum continuous thermal limit (in MVA).
+- [7] rate_b: Thermal limit under contingency (emergency).
+- [8] rate_c: Absolute maximum limit under extreme conditions.
+
+edge_label → shape [num_ac_lines, 4]:
+- [0] pt: Real power flowing **toward** the destination bus (MW).
+- [1] qt: Reactive power flowing **toward** the destination bus (MVAr).
+- [2] pf: Real power flowing **from** the source bus.
+- [3] qf: Reactive power flowing **from** the source bus.
+
+---
+
+### Transformer: ('bus', 'transformer', 'bus')  
+Models a two-winding transformer with tap control and angle shift.
+
+edge_index → shape [2, num_transformers]:
+- Row 0: Source bus index
+- Row 1: Destination bus index
+
+edge_attr → shape [num_transformers, 11]:
+- [0] θ_l: Min angle difference allowed across transformer.
+- [1] θ_u: Max angle difference.
+- [2] br_r: Transformer resistance (series loss).
+- [3] br_x: Transformer reactance (impedance).
+- [4] rate_a: Continuous thermal rating (in MVA).
+- [5] rate_b: Emergency thermal rating.
+- [6] rate_c: Absolute thermal rating.
+- [7] tap: Tap ratio (voltage magnitude scaling).
+- [8] shift: Phase shift (in degrees or radians).
+- [9] b_from: Charging susceptance at the source bus side.
+- [10] b_to: Charging susceptance at the target bus side.
+
+edge_label → shape [num_transformers, 4]:
+- [0] pt: Real power flowing **toward** the destination bus (MW).
+- [1] qt: Reactive power flowing **toward** the destination bus (MVAr).
+- [2] pf: Real power flowing **from** the source bus.
+- [3] qf: Reactive power flowing **from** the source bus
+
+---
+
+### Component Links (no features or labels)
+These edges are used only to attach devices to their corresponding bus. They are directional connections.
+
+edge_index → shape [2, N]:
+- Row 0: Source node index (generator/load/shunt)
+- Row 1: Target node index (bus)
+
+Available link types:
+- ('generator', 'generator_link', 'bus')
+- ('bus', 'generator_link', 'generator')
+- ('load', 'load_link', 'bus')
+- ('bus', 'load_link', 'load')
+- ('shunt', 'shunt_link', 'bus')
+- ('bus', 'shunt_link', 'shunt')
 
 # CODING RULES:
 - Do NOT assume any labels yourself in the data.
@@ -120,71 +169,121 @@ fix_prompt="""
 <user>
 The following code failed. Fix it according to this schema strictly and only output the fixed Python code.
 # DATA SCHEMA 
-## NODE TYPES:
-### `data['bus']` (Node):
-- `data['bus'].x`: shape [num_buses, 4]
-  - Column 0 → base_voltage_kv (base_kv)
-  - Column 1 → bus_type (PQ=1, PV=2, ref=3, inactive=4)
-  - Column 2 → minimum_voltage_magnitude_limit (vmin)
-  - Column 3 → maximum_voltage_magnitude_limit (vmax)
+## NODE TYPES
 
-- `data['bus'].y`: shape [num_buses, 2]
-  - Column 0 → voltage_angle_solution (va)
-  - Column 1 → voltage_magnitude_solution (vm)
+data['bus'].x → shape [num_buses, 4]:
+- [0] base_kv: Base voltage level (in kilovolts) used for converting real-world units to per-unit system for numerical stability.
+- [1] bus_type: Integer code for bus category: 1=PQ (load bus), 2=PV (generator bus), 3=ref/slack bus (voltage + angle reference), 4=inactive (not part of power flow).
+- [2] vmin: Minimum allowable voltage magnitude at the bus (in per-unit); enforces voltage safety lower bound.
+- [3] vmax: Maximum allowable voltage magnitude at the bus (in per-unit); enforces voltage safety upper bound.
 
-### `data['generator']` (Node):
-- `data['generator'].x`: shape [num_generators, 11]
-  - Column 0 → machine_base_mva (mbase)
-  - Column 1 → active_power_output (pg)
-  - Column 2 → minimum_active_power (pmin)
-  - Column 3 → maximum_active_power (pmax)
-  - Column 4 → reactive_power_output (qg)
-  - Column 5 → minimum_reactive_power (qmin)
-  - Column 6 → maximum_reactive_power (qmax)
-  - Column 7 → voltage_setpoint (vg)
-  - Column 8 → cost_quadratic (c2)
-  - Column 9 → cost_linear (c1)
-  - Column 10 → cost_constant (c0)
+data['bus'].y → shape [num_buses, 2]:
+- [0] va: Voltage angle solution (in radians) after power flow is solved; relative phase of voltage.
+- [1] vm: Voltage magnitude solution (in per-unit) after power flow is solved.
 
-- `data['generator'].y`: shape [num_generators, 2]
-  - Column 0 → active_power_solution (pg)
-  - Column 1 → reactive_power_solution (qg)
+---
 
-### `data['load']` (Node):
-- `data['load'].x`: shape [num_loads, 2]
-  - Column 0 → active_power_demand (pd)
-  - Column 1 → reactive_power_demand (qd)
+data['generator'].x → shape [num_generators, 11]:
+- [0] mbase: Generator’s power base rating (in MVA); used for scaling internal parameters.
+- [1] pg: Scheduled or forecasted real power output (in MW).
+- [2] pmin: Minimum real power the generator is allowed to produce.
+- [3] pmax: Maximum real power limit.
+- [4] qg: Scheduled reactive power output (in MVAr).
+- [5] qmin: Minimum reactive power limit.
+- [6] qmax: Maximum reactive power limit.
+- [7] vg: Voltage magnitude setpoint for the bus this generator is controlling (applies if PV or ref bus).
+- [8] c2: Coefficient of quadratic term in generator cost function (for pg²).
+- [9] c1: Linear cost coefficient (for pg).
+- [10] c0: Constant offset in cost function.
 
-### `data['shunt']` (Node):
-- `data['shunt'].x`: shape [num_shunts, 2]
-  - Column 0 → susceptance (bs)
-  - Column 1 → conductance (gs)
+data['generator'].y → shape [num_generators, 2]:
+- [0] pg: Real power output from the generator after solving the OPF (solution value).
+- [1] qg: Reactive power output from the generator after solving OPF.
 
-## EDGE TYPES (Heterogeneous):
+---
 
-### AC Line: `('bus', 'ac_line', 'bus')`
-- `edge_index`: [2, num_ac_lines] — [source_bus_index, target_bus_index]
-- `edge_attr`: [num_ac_lines, 9]
-  - angle_min (θ_l), angle_max (θ_u), b_from, b_to,
-    resistance (br_r), reactance (br_x),
-    thermal_rating_a (rate_a), b (rate_b), c (rate_c)
-- `edge_label`: [num_ac_lines, 4]
-  - active_power_to (pt), reactive_power_to (qt),
-    active_power_from (pf), reactive_power_from (qf)
+data['load'].x → shape [num_loads, 2]:
+- [0] pd: Active power demand at this load (in MW).
+- [1] qd: Reactive power demand (in MVAr); affects voltage and power factor.
 
-### Transformer: `('bus', 'transformer', 'bus')`
-- `edge_index`: [2, num_transformers]
-- `edge_attr`: [num_transformers, 11]
-  - angle_min (θ_l), angle_max (θ_u), resistance (br_r), reactance (br_x),
-    thermal_rating_a (rate_a), b (rate_b), c (rate_c),
-    tap_ratio (tap), phase_shift (shift), b_from, b_to
-- `edge_label`: [num_transformers, 4] → [pt, qt, pf, qf]
+---
 
-### Generator/Load/Shunt Links:
-- `('generator', 'generator_link', 'bus')` and `('bus', 'generator_link', 'generator')`
-- `('load', 'load_link', 'bus')` and `('bus', 'load_link', 'load')`
-- `('shunt', 'shunt_link', 'bus')` and `('bus', 'shunt_link', 'shunt')`
-- `edge_index`: [2, N] — connectivity only
+data['shunt'].x → shape [num_shunts, 2]:
+- [0] bs: Susceptance (imaginary admittance); controls how much reactive power is injected or absorbed.
+- [1] gs: Conductance (real part of admittance); models energy loss at the shunt (real power dissipation).
+
+---
+
+## EDGE TYPES
+
+### AC Line: ('bus', 'ac_line', 'bus')  
+Models physical transmission lines between buses.
+
+edge_index → shape [2, num_ac_lines]:
+- Row 0: Source bus index (from bus)
+- Row 1: Destination bus index (to bus)
+
+edge_attr → shape [num_ac_lines, 9]:
+- [0] θ_l: Minimum allowed voltage angle difference between source and target bus.
+- [1] θ_u: Maximum allowed voltage angle difference.
+- [2] b_from: Shunt charging susceptance on the "from" bus side.
+- [3] b_to: Shunt charging susceptance on the "to" bus side.
+- [4] br_r: Series resistance of the line (causes real power loss).
+- [5] br_x: Series reactance of the line (affects voltage drop and reactive flow).
+- [6] rate_a: Maximum continuous thermal limit (in MVA).
+- [7] rate_b: Thermal limit under contingency (emergency).
+- [8] rate_c: Absolute maximum limit under extreme conditions.
+
+edge_label → shape [num_ac_lines, 4]:
+- [0] pt: Real power flowing **toward** the destination bus (MW).
+- [1] qt: Reactive power flowing **toward** the destination bus (MVAr).
+- [2] pf: Real power flowing **from** the source bus.
+- [3] qf: Reactive power flowing **from** the source bus.
+
+---
+
+### Transformer: ('bus', 'transformer', 'bus')  
+Models a two-winding transformer with tap control and angle shift.
+
+edge_index → shape [2, num_transformers]:
+- Row 0: Source bus index
+- Row 1: Destination bus index
+
+edge_attr → shape [num_transformers, 11]:
+- [0] θ_l: Min angle difference allowed across transformer.
+- [1] θ_u: Max angle difference.
+- [2] br_r: Transformer resistance (series loss).
+- [3] br_x: Transformer reactance (impedance).
+- [4] rate_a: Continuous thermal rating (in MVA).
+- [5] rate_b: Emergency thermal rating.
+- [6] rate_c: Absolute thermal rating.
+- [7] tap: Tap ratio (voltage magnitude scaling).
+- [8] shift: Phase shift (in degrees or radians).
+- [9] b_from: Charging susceptance at the source bus side.
+- [10] b_to: Charging susceptance at the target bus side.
+
+edge_label → shape [num_transformers, 4]:
+- [0] pt: Real power flowing **toward** the destination bus (MW).
+- [1] qt: Reactive power flowing **toward** the destination bus (MVAr).
+- [2] pf: Real power flowing **from** the source bus.
+- [3] qf: Reactive power flowing **from** the source bus.
+
+---
+
+### Component Links (no features or labels)
+These edges are used only to attach devices to their corresponding bus. They are directional connections.
+
+edge_index → shape [2, N]:
+- Row 0: Source node index (generator/load/shunt)
+- Row 1: Target node index (bus)
+
+Available link types:
+- ('generator', 'generator_link', 'bus')
+- ('bus', 'generator_link', 'generator')
+- ('load', 'load_link', 'bus')
+- ('bus', 'load_link', 'load')
+- ('shunt', 'shunt_link', 'bus')
+- ('bus', 'shunt_link', 'shunt')
 </user>
 <broken-code>
 {code_block}
