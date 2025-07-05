@@ -56,80 +56,100 @@ data['shunt'].x → shape [num_shunts, 2]:
 
 ---
 
-## EDGE TYPES
+## EDGE TYPES (All edges are typed and directional in HeteroData)
 
-### AC Line: ('bus', 'ac_line', 'bus')  
-Models physical transmission lines between buses.
+In this dataset, power flow and connectivity between nodes is modeled using edges. Each edge type includes:
+- `edge_index`: [2, N] → source and target node indices
+- `edge_attr`: [N, F] → physical properties of the connection (F = number of features)
+- `edge_label`: [N, L] → solution values like power flows (L = number of labels)
 
-edge_index → shape [2, num_ac_lines]:
-- Row 0: Source bus index (from bus)
-- Row 1: Destination bus index (to bus)
-
-edge_attr → shape [num_ac_lines, 9]:
-- [0] θ_l: Minimum allowed voltage angle difference between source and target bus.
-- [1] θ_u: Maximum allowed voltage angle difference.
-- [2] b_from: Shunt charging susceptance on the "from" bus side.
-- [3] b_to: Shunt charging susceptance on the "to" bus side.
-- [4] br_r: Series resistance of the line (causes real power loss).
-- [5] br_x: Series reactance of the line (affects voltage drop and reactive flow).
-- [6] rate_a: Maximum continuous thermal limit (in MVA).
-- [7] rate_b: Thermal limit under contingency (emergency).
-- [8] rate_c: Absolute maximum limit under extreme conditions.
-
-edge_label → shape [num_ac_lines, 4]:
-- [0] pt: Real power flowing **toward** the destination bus (MW).
-- [1] qt: Reactive power flowing **toward** the destination bus (MVAr).
-- [2] pf: Real power flowing **from** the source bus.
-- [3] qf: Reactive power flowing **from** the source bus.
+⚠️ Do not use `.y` for edges — use `edge_label` for solution quantities like power flow.
 
 ---
 
-### Transformer: ('bus', 'transformer', 'bus')  
-Models a two-winding transformer with tap control and angle shift.
+### AC Line: `('bus', 'ac_line', 'bus')`  
+Represents physical transmission lines between buses.
 
-edge_index → shape [2, num_transformers]:
-- Row 0: Source bus index
-- Row 1: Destination bus index
+- `edge_index`: shape [2, num_ac_lines]
+  - Row 0: source bus index (`from_bus`)
+  - Row 1: target bus index (`to_bus`)
+  - These indicate which two buses are connected by a line
 
-edge_attr → shape [num_transformers, 11]:
-- [0] θ_l: Min angle difference allowed across transformer.
-- [1] θ_u: Max angle difference.
-- [2] br_r: Transformer resistance (series loss).
-- [3] br_x: Transformer reactance (impedance).
-- [4] rate_a: Continuous thermal rating (in MVA).
-- [5] rate_b: Emergency thermal rating.
-- [6] rate_c: Absolute thermal rating.
-- [7] tap: Tap ratio (voltage magnitude scaling).
-- [8] shift: Phase shift (in degrees or radians).
-- [9] b_from: Charging susceptance at the source bus side.
-- [10] b_to: Charging susceptance at the target bus side.
+- `edge_attr`: shape [num_ac_lines, 9]
+  - [0] θ_l: Minimum allowed angle difference between buses
+  - [1] θ_u: Maximum allowed angle difference
+  - [2] b_from: Shunt susceptance on source bus side
+  - [3] b_to: Shunt susceptance on target bus side
+  - [4] br_r: Line resistance
+  - [5] br_x: Line reactance
+  - [6] rate_a: Normal thermal limit (MVA)
+  - [7] rate_b: Emergency thermal limit
+  - [8] rate_c: Absolute maximum thermal limit
 
-edge_label → shape [num_transformers, 4]:
-- [0] pt: Real power flowing **toward** the destination bus (MW).
-- [1] qt: Reactive power flowing **toward** the destination bus (MVAr).
-- [2] pf: Real power flowing **from** the source bus.
-- [3] qf: Reactive power flowing **from** the source bus
+- `edge_label`: shape [num_ac_lines, 4]
+  - [0] pt: Real power flowing **toward the target bus**
+  - [1] qt: Reactive power flowing **toward the target bus**
+  - [2] pf: Real power flowing **from the source bus**
+  - [3] qf: Reactive power flowing **from the source bus**
 
 ---
 
-### Component Links (no features or labels)
-These edges are used only to attach devices to their corresponding bus. They are directional connections.
+### Transformer: `('bus', 'transformer', 'bus')`  
+Models two-winding transformers between buses with optional tap changers.
 
-edge_index → shape [2, N]:
-- Row 0: Source node index (generator/load/shunt)
-- Row 1: Target node index (bus)
+- `edge_index`: shape [2, num_transformers]
+  - Row 0: source bus index
+  - Row 1: target bus index
 
-Available link types:
-- ('generator', 'generator_link', 'bus')
-- ('bus', 'generator_link', 'generator')
-- ('load', 'load_link', 'bus')
-- ('bus', 'load_link', 'load')
-- ('shunt', 'shunt_link', 'bus')
-- ('bus', 'shunt_link', 'shunt')
+- `edge_attr`: shape [num_transformers, 11]
+  - [0] θ_l: Min angle difference
+  - [1] θ_u: Max angle difference
+  - [2] br_r: Transformer resistance
+  - [3] br_x: Transformer reactance
+  - [4] rate_a: Normal rating
+  - [5] rate_b: Emergency rating
+  - [6] rate_c: Absolute max rating
+  - [7] tap: Voltage magnitude tap ratio
+  - [8] shift: Phase shift angle
+  - [9] b_from: Charging susceptance from source bus
+  - [10] b_to: Charging susceptance to target bus
+
+- `edge_label`: shape [num_transformers, 4]
+  - Same structure as AC lines: [pt, qt, pf, qf]
+
+---
+
+### Device-to-Bus Links (connectivity edges, no attributes or labels)
+
+Used to connect component nodes (like generators or loads) to their parent buses. These edges define topology but do not carry physical parameters.
+
+Each edge has:
+- `edge_index`: [2, N]
+  - Row 0: source index (component)
+  - Row 1: target index (bus)
+
+List of device edges:
+- `('generator', 'generator_link', 'bus')`
+- `('bus', 'generator_link', 'generator')`
+- `('load', 'load_link', 'bus')`
+- `('bus', 'load_link', 'load')`
+- `('shunt', 'shunt_link', 'bus')`
+- `('bus', 'shunt_link', 'shunt')`
+
+These edges do not have:
+- `edge_attr`
+- `edge_label`
+
+
+📌 Note:
+- Use `edge_label` when querying power flow (not `.y`)
+- Use `edge_index` to identify which nodes (e.g., buses) are involved in high-loading conditions
+- Use link edges to map generators to buses (`data['generator', 'generator_link', 'bus'].edge_index`)
+---
 
 # CODING RULES:
 - Do NOT assume any labels yourself in the data.
-- Don't give functions in the code. 
+- If a function is given output, run it too.
 - Use `matplotlib.pyplot` with `fig, ax = plt.subplots()` for plots.
 - Never make plots for each object 'data'. If required make plots for the whole dataset only.
 - No markdown, comments, triple backticks, or explanations.
@@ -217,76 +237,97 @@ data['shunt'].x → shape [num_shunts, 2]:
 
 ---
 
-## EDGE TYPES
+## EDGE TYPES (All edges are typed and directional in HeteroData)
 
-### AC Line: ('bus', 'ac_line', 'bus')  
-Models physical transmission lines between buses.
+In this dataset, power flow and connectivity between nodes is modeled using edges. Each edge type includes:
+- `edge_index`: [2, N] → source and target node indices
+- `edge_attr`: [N, F] → physical properties of the connection (F = number of features)
+- `edge_label`: [N, L] → solution values like power flows (L = number of labels)
 
-edge_index → shape [2, num_ac_lines]:
-- Row 0: Source bus index (from bus)
-- Row 1: Destination bus index (to bus)
-
-edge_attr → shape [num_ac_lines, 9]:
-- [0] θ_l: Minimum allowed voltage angle difference between source and target bus.
-- [1] θ_u: Maximum allowed voltage angle difference.
-- [2] b_from: Shunt charging susceptance on the "from" bus side.
-- [3] b_to: Shunt charging susceptance on the "to" bus side.
-- [4] br_r: Series resistance of the line (causes real power loss).
-- [5] br_x: Series reactance of the line (affects voltage drop and reactive flow).
-- [6] rate_a: Maximum continuous thermal limit (in MVA).
-- [7] rate_b: Thermal limit under contingency (emergency).
-- [8] rate_c: Absolute maximum limit under extreme conditions.
-
-edge_label → shape [num_ac_lines, 4]:
-- [0] pt: Real power flowing **toward** the destination bus (MW).
-- [1] qt: Reactive power flowing **toward** the destination bus (MVAr).
-- [2] pf: Real power flowing **from** the source bus.
-- [3] qf: Reactive power flowing **from** the source bus.
+⚠️ Do not use `.y` for edges — use `edge_label` for solution quantities like power flow.
 
 ---
 
-### Transformer: ('bus', 'transformer', 'bus')  
-Models a two-winding transformer with tap control and angle shift.
+### AC Line: `('bus', 'ac_line', 'bus')`  
+Represents physical transmission lines between buses.
 
-edge_index → shape [2, num_transformers]:
-- Row 0: Source bus index
-- Row 1: Destination bus index
+- `edge_index`: shape [2, num_ac_lines]
+  - Row 0: source bus index (`from_bus`)
+  - Row 1: target bus index (`to_bus`)
+  - These indicate which two buses are connected by a line
 
-edge_attr → shape [num_transformers, 11]:
-- [0] θ_l: Min angle difference allowed across transformer.
-- [1] θ_u: Max angle difference.
-- [2] br_r: Transformer resistance (series loss).
-- [3] br_x: Transformer reactance (impedance).
-- [4] rate_a: Continuous thermal rating (in MVA).
-- [5] rate_b: Emergency thermal rating.
-- [6] rate_c: Absolute thermal rating.
-- [7] tap: Tap ratio (voltage magnitude scaling).
-- [8] shift: Phase shift (in degrees or radians).
-- [9] b_from: Charging susceptance at the source bus side.
-- [10] b_to: Charging susceptance at the target bus side.
+- `edge_attr`: shape [num_ac_lines, 9]
+  - [0] θ_l: Minimum allowed angle difference between buses
+  - [1] θ_u: Maximum allowed angle difference
+  - [2] b_from: Shunt susceptance on source bus side
+  - [3] b_to: Shunt susceptance on target bus side
+  - [4] br_r: Line resistance
+  - [5] br_x: Line reactance
+  - [6] rate_a: Normal thermal limit (MVA)
+  - [7] rate_b: Emergency thermal limit
+  - [8] rate_c: Absolute maximum thermal limit
 
-edge_label → shape [num_transformers, 4]:
-- [0] pt: Real power flowing **toward** the destination bus (MW).
-- [1] qt: Reactive power flowing **toward** the destination bus (MVAr).
-- [2] pf: Real power flowing **from** the source bus.
-- [3] qf: Reactive power flowing **from** the source bus.
+- `edge_label`: shape [num_ac_lines, 4]
+  - [0] pt: Real power flowing **toward the target bus**
+  - [1] qt: Reactive power flowing **toward the target bus**
+  - [2] pf: Real power flowing **from the source bus**
+  - [3] qf: Reactive power flowing **from the source bus**
 
 ---
 
-### Component Links (no features or labels)
-These edges are used only to attach devices to their corresponding bus. They are directional connections.
+### Transformer: `('bus', 'transformer', 'bus')`  
+Models two-winding transformers between buses with optional tap changers.
 
-edge_index → shape [2, N]:
-- Row 0: Source node index (generator/load/shunt)
-- Row 1: Target node index (bus)
+- `edge_index`: shape [2, num_transformers]
+  - Row 0: source bus index
+  - Row 1: target bus index
 
-Available link types:
-- ('generator', 'generator_link', 'bus')
-- ('bus', 'generator_link', 'generator')
-- ('load', 'load_link', 'bus')
-- ('bus', 'load_link', 'load')
-- ('shunt', 'shunt_link', 'bus')
-- ('bus', 'shunt_link', 'shunt')
+- `edge_attr`: shape [num_transformers, 11]
+  - [0] θ_l: Min angle difference
+  - [1] θ_u: Max angle difference
+  - [2] br_r: Transformer resistance
+  - [3] br_x: Transformer reactance
+  - [4] rate_a: Normal rating
+  - [5] rate_b: Emergency rating
+  - [6] rate_c: Absolute max rating
+  - [7] tap: Voltage magnitude tap ratio
+  - [8] shift: Phase shift angle
+  - [9] b_from: Charging susceptance from source bus
+  - [10] b_to: Charging susceptance to target bus
+
+- `edge_label`: shape [num_transformers, 4]
+  - Same structure as AC lines: [pt, qt, pf, qf]
+
+---
+
+### Device-to-Bus Links (connectivity edges, no attributes or labels)
+
+Used to connect component nodes (like generators or loads) to their parent buses. These edges define topology but do not carry physical parameters.
+
+Each edge has:
+- `edge_index`: [2, N]
+  - Row 0: source index (component)
+  - Row 1: target index (bus)
+
+List of device edges:
+- `('generator', 'generator_link', 'bus')`
+- `('bus', 'generator_link', 'generator')`
+- `('load', 'load_link', 'bus')`
+- `('bus', 'load_link', 'load')`
+- `('shunt', 'shunt_link', 'bus')`
+- `('bus', 'shunt_link', 'shunt')`
+
+These edges do not have:
+- `edge_attr`
+- `edge_label`
+
+---
+
+📌 Note:
+- Use `edge_label` when querying power flow (not `.y`)
+- Use `edge_index` to identify which nodes (e.g., buses) are involved in high-loading conditions
+- Use link edges to map generators to buses (`data['generator', 'generator_link', 'bus'].edge_index`)
+
 </user>
 <broken-code>
 {code_block}
