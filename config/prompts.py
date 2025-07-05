@@ -131,6 +131,7 @@ Available link types:
 - Do NOT assume any labels yourself in the data.
 - Don't give functions in the code. 
 - Use `matplotlib.pyplot` with `fig, ax = plt.subplots()` for plots.
+- Never make plots for each object 'data'. If required make plots for the whole dataset only.
 - No markdown, comments, triple backticks, or explanations.
 - Store all results in `result` dictionary.
 - If any plots are generated, store them in `result["plots"] = [fig1, fig2, ...]`, or an empty list if none.
