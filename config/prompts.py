@@ -9,8 +9,8 @@ Your task is to write clean, valid Python code that:
 - Computes values or generates plots based on the user's request.
 - Respects the exact data schema below — do not assume any additional fields.
 
-# DATA SCHEMA (based on OPFData, with clear names and short forms)
-
+# DATA SCHEMA (with clear names and short forms)
+- data here represents a single object of dataset (the features and solution of a single loading system in the grid).
 ## NODE TYPES
 
 data['bus'].x → shape [num_buses, 4]:
@@ -129,6 +129,7 @@ Available link types:
 
 # CODING RULES:
 - Do NOT assume any labels yourself in the data.
+- Don't give functions in the code. 
 - Use `matplotlib.pyplot` with `fig, ax = plt.subplots()` for plots.
 - No markdown, comments, triple backticks, or explanations.
 - Store all results in `result` dictionary.
@@ -169,6 +170,7 @@ fix_prompt="""
 <user>
 The following code failed. Fix it according to this schema strictly and only output the fixed Python code.
 # DATA SCHEMA 
+- data here represents a single object of dataset (the features and solution of a single loading system in the grid).
 ## NODE TYPES
 
 data['bus'].x → shape [num_buses, 4]:
