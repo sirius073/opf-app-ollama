@@ -7,7 +7,7 @@ torch.classes.__path__ = []
 import streamlit as st
 import json
 from config.prompts import code_template, summary_template
-from core.model import query_ollama
+from core.model import query_ollama, refine_query_with_llm, load_phi2_electrical_model
 from core.executor import run_pipeline
 from torch_geometric.datasets import OPFDataset
 
@@ -31,26 +31,58 @@ with st.sidebar:
 
     if st.button("Load Model and Data"):
         try:
+            # Load OPF dataset
             dataset = OPFDataset(root='data', case_name=selected_case)
             st.session_state.data = dataset
             st.session_state.model_id = model_id
+
+            # Load Phi-2 fine-tuned model only once
+            with st.spinner("🔌 Loading Phi-2 Electrical Model..."):
+                phi_model, phi_tokenizer = load_phi2_electrical_model()
+                st.session_state.phi_model = phi_model
+                st.session_state.phi_tokenizer = phi_tokenizer
+
             st.session_state.model_loaded = True
-            st.success(f"✅ Loaded dataset {selected_case}!")
+            st.success(f"✅ Loaded dataset {selected_case} and models!")
         except Exception as e:
-            st.error(f"❌ Error loading dataset: {e}")
+            st.error(f"❌ Error loading dataset or models: {e}")
 
 # Main logic after loading
 if st.session_state.model_loaded:
     st.subheader("💬 Ask a Question")
     query = st.text_area("Enter your prompt", height=150)
+    use_refinement = st.checkbox("🔍 Refine query using Phi-2 Electrical Engineering model")
 
     if st.button("Run Query"):
+        final_query = query
+        refined_instruction = None
+
+        # Apply query refinement if selected
+        if use_refinement:
+            with st.spinner("🧠 Refining query using Phi-2..."):
+                try:
+                    refined_instruction = refine_query_with_llm(
+                        query, 
+                        st.session_state.phi_model, 
+                        st.session_state.phi_tokenizer
+                    )
+                    # Combine user query + instruction for final query to Ollama
+                    final_query = f"{query}\n\nInstruction: {refined_instruction}"
+                except Exception as e:
+                    st.warning(f"⚠️ Refinement failed, using original query.\n{e}")
+                    final_query = query
+
         with st.spinner("⚙️ Running query through Ollama..."):
             summary, code, result_dict = run_pipeline(
-                query=query,
+                query=final_query,
                 dataset=st.session_state.data,
                 model_id=st.session_state.model_id
             )
+
+        # Show refined instruction if applicable
+        if use_refinement and refined_instruction:
+            st.subheader("🧾 Refined Instruction (Phi-2):")
+            st.code(refined_instruction)
 
         st.subheader("🧠 Generated Code")
         st.code(code, language="python")
@@ -76,7 +108,6 @@ if st.session_state.model_loaded:
             except:
                 st.plotly_chart(result_dict["plot"])
 
-        # Final summary
         st.success(f"✅ {summary}")
 else:
     st.info("📂 Load a model and dataset to begin.")
