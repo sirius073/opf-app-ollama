@@ -21,7 +21,7 @@ if "model_loaded" not in st.session_state:
 # Sidebar for model + data loading
 with st.sidebar:
     st.header("Configuration")
-    model_id = st.text_input("Ollama Model ID", value="deepseek-coder:6.7b-instruct")
+    model_id = st.text_input("Ollama Model ID", value="deepseek-coder:33b-instruct")
 
     dataset_options = [
         "pglib_opf_case14_ieee",
@@ -71,18 +71,18 @@ if st.session_state.model_loaded:
                 except Exception as e:
                     st.warning(f"⚠️ Refinement failed, using original query.\n{e}")
                     final_query = query
-
+                    
+        # Show refined instruction if applicable
+        if use_refinement and refined_instruction:
+            st.subheader("🧾 Refined Instruction (Phi-2):")
+            st.code(refined_instruction)
+            
         with st.spinner("⚙️ Running query through Ollama..."):
             summary, code, result_dict = run_pipeline(
                 query=final_query,
                 dataset=st.session_state.data,
                 model_id=st.session_state.model_id
             )
-
-        # Show refined instruction if applicable
-        if use_refinement and refined_instruction:
-            st.subheader("🧾 Refined Instruction (Phi-2):")
-            st.code(refined_instruction)
 
         st.subheader("🧠 Generated Code")
         st.code(code, language="python")
