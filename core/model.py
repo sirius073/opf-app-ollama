@@ -20,7 +20,6 @@ def query_ollama(prompt, model="deepseek-coder:33b-instruct"):
         print(f"[Ollama Error] {e}")
         return f"ERROR: {str(e)}"
 
-# Load the Phi-2 base and LoRA adapter
 def load_phi2_electrical_model():
     base_model = "microsoft/phi-2"
     adapter_model = "STEM-AI-mtl/phi-2-electrical-engineering"
@@ -28,13 +27,9 @@ def load_phi2_electrical_model():
     tokenizer = AutoTokenizer.from_pretrained(base_model, trust_remote_code=True)
     base = AutoModelForCausalLM.from_pretrained(base_model, device_map="auto", trust_remote_code=True)
     model = PeftModel.from_pretrained(base, adapter_model)
-
     return model, tokenizer
 
-# Refine user query using Phi-2 electrical model
-def refine_query_with_llm(user_query):
-    model, tokenizer = load_phi2_electrical_model()
-
+def refine_query_with_llm(user_query, model, tokenizer):
     prompt = f"""
 ### Instruction:
 You are an Electrical and Power System expert.
@@ -48,11 +43,10 @@ User Query: {user_query}
 
 ### Response:
 """
-
     inputs = tokenizer(prompt, return_tensors="pt").to(model.device)
     outputs = model.generate(**inputs, max_new_tokens=300, temperature=1)
     decoded_output = tokenizer.decode(outputs[0], skip_special_tokens=True)
-
-    # Extract only the relevant response
+    # Clean the response
     response_part = decoded_output.split("### Response:")[-1].split("```")[0].strip()
     return response_part
+
