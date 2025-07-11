@@ -161,6 +161,7 @@ These edges do not have:
 
 <user>
 {query}
+- If a function is written it should always be executed in the code with accurate arguments.
 </user>
 
 <code>
