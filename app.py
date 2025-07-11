@@ -68,15 +68,12 @@ if st.session_state.model_loaded:
                     )
                     # Combine user query + instruction for final query to Ollama
                     final_query = f"{query}\n\nInstruction: {refined_instruction}"
+                    st.subheader("🧾 Refined Instruction (Phi-2):")
+                    st.code(refined_instruction)
                 except Exception as e:
                     st.warning(f"⚠️ Refinement failed, using original query.\n{e}")
                     final_query = query
-                    
-        # Show refined instruction if applicable
-        if use_refinement and refined_instruction:
-            st.subheader("🧾 Refined Instruction (Phi-2):")
-            st.code(refined_instruction)
-            
+                   
         with st.spinner("⚙️ Running query through Ollama..."):
             summary, code, result_dict = run_pipeline(
                 query=final_query,
