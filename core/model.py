@@ -40,6 +40,7 @@ NOTE:-
 - The dataset is already loaded.
 - Do not mention accessing the dataset.
 - Do not instruct to print anything and instead just store it in 'result' dictionary.
+- Always give the last instruction to execute the function.
 User Query: {user_query}
 
 ### Response:
