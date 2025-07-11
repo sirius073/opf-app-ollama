@@ -36,11 +36,11 @@ with st.sidebar:
             st.session_state.data = dataset
             st.session_state.model_id = model_id
 
-            # # Load Phi-2 fine-tuned model only once
-            # with st.spinner("🔌 Loading Phi-2 Electrical Model..."):
-            #     phi_model, phi_tokenizer = load_phi2_electrical_model()
-            #     st.session_state.phi_model = phi_model
-            #     st.session_state.phi_tokenizer = phi_tokenizer
+            # Load Phi-2 fine-tuned model only once
+            with st.spinner("🔌 Loading Phi-2 Electrical Model..."):
+                phi_model, phi_tokenizer = load_phi2_electrical_model()
+                st.session_state.phi_model = phi_model
+                st.session_state.phi_tokenizer = phi_tokenizer
 
             st.session_state.model_loaded = True
             st.success(f"✅ Loaded dataset {selected_case} and models!")
