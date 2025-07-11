@@ -11,7 +11,7 @@ def query_ollama(prompt, model="deepseek-coder:33b-instruct"):
                 "prompt": prompt,
                 "stream": False
             },
-            timeout=60 
+            timeout=180
         )
         response.raise_for_status()
         data = response.json()
@@ -27,6 +27,7 @@ def load_phi2_electrical_model():
     tokenizer = AutoTokenizer.from_pretrained(base_model, trust_remote_code=True)
     base = AutoModelForCausalLM.from_pretrained(base_model, device_map="auto", trust_remote_code=True)
     model = PeftModel.from_pretrained(base, adapter_model)
+    model.eval()
     return model, tokenizer
 
 def refine_query_with_llm(user_query, model, tokenizer):
